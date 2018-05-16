@@ -102,6 +102,9 @@ boolean anyPixelPressed = false;
 // Optional delay between shift register reads
 #define POLL_DELAY_MSEC   50
 
+// delay between animation loops
+#define ANIMATE_DELAY_MSEC   100
+
 int ploadPin = 8;  // Connects to Parallel load pin the 165
 int clockEnablePin = 9;  // Connects to Clock Enable pin the 165
 int dataPin = 11; // Connects to the Q7 pin the 165
@@ -466,47 +469,54 @@ void loop()
   
   // read the new switch values
   readSwitches();
-
+ 
   if(anyPixelPressed) {
+    // reset the screen saver timer
     reset_screen_saver_timer();
-  }
 
-  // check to see if this is a mode switch event
-  if(pixelPressed[MODE_CHANGE_COL][MODE_CHANGE_ROW] == true) {
-    if(pixelPressed[MODE_CYCLE_COL][MODE_ROW] == true) {
-      mode_color_cycle_init();
-    }
-    else if(pixelPressed[MODE_PAINT_COL][MODE_ROW] == true) {
-      mode_paint_init();
-    }
-    else if(pixelPressed[MODE_FADE_COL][MODE_ROW] == true) {
-      mode_fade_init();
-    }
-    else if(pixelPressed[MODE_EXPANDING_BOXES_COL][MODE_ROW] == true) {
-      mode_expanding_boxes_init();
-    }
-    else if(pixelPressed[MODE_CLEAR_COL][MODE_ROW] == true) {
-      clear(true);
-    }
-    else if((pixelPressed[MODE_TIMER_COL][MODE_ROW] == true) && (pixelPressedPrior[MODE_TIMER_COL][MODE_ROW] == false)) {
-      currentTime = millis();
-      
-      Serial.print("# loops = ");
-      Serial.print(numLoops);
-      Serial.print(" duration = ");
-      Serial.print(currentTime - timerStart);
-      Serial.print(" avg loop time = ");
-      Serial.println((currentTime - timerStart) / (double) numLoops);
-
-      numLoops = 0;
-      timerStart = currentTime;
-    }
-    else if(millis() >= screenSaverTimer) {
-      reset_screen_saver_timer();
-
-      if(mode != MODE_EXPANDING_BOXES) {
+    // check to see if this is a mode switch event
+    if(pixelPressed[MODE_CHANGE_COL][MODE_CHANGE_ROW] == true) {
+      if(pixelPressed[MODE_CYCLE_COL][MODE_ROW] == true) {
+        mode_color_cycle_init();
+      }
+      else if(pixelPressed[MODE_PAINT_COL][MODE_ROW] == true) {
+        mode_paint_init();
+      }
+      else if(pixelPressed[MODE_FADE_COL][MODE_ROW] == true) {
+        mode_fade_init();
+      }
+      else if(pixelPressed[MODE_EXPANDING_BOXES_COL][MODE_ROW] == true) {
         mode_expanding_boxes_init();
       }
+      else if(pixelPressed[MODE_CLEAR_COL][MODE_ROW] == true) {
+        clear(true);
+      }
+      else if((pixelPressed[MODE_TIMER_COL][MODE_ROW] == true) && (pixelPressedPrior[MODE_TIMER_COL][MODE_ROW] == false)) {
+        currentTime = millis();
+        
+        Serial.print("# loops = ");
+        Serial.print(numLoops);
+        Serial.print(" duration = ");
+        Serial.print(currentTime - timerStart);
+        Serial.print(" avg loop time = ");
+        Serial.println((currentTime - timerStart) / (double) numLoops);
+  
+        numLoops = 0;
+        timerStart = currentTime;
+      }
+    }
+    else {
+      // if the screen saver was active, and this is a pixel press, then switch to paint mode
+      if(mode == MODE_EXPANDING_BOXES) {
+        mode_paint_init();
+      }
+    }
+  }
+  else if(millis() >= screenSaverTimer) {
+    reset_screen_saver_timer();
+
+    if(mode != MODE_EXPANDING_BOXES) {
+      mode_expanding_boxes_init();
     }
   }
 
@@ -528,6 +538,7 @@ void loop()
       break;
     case MODE_EXPANDING_BOXES:
       mode_expanding_boxes_loop();
+      delayLength = ANIMATE_DELAY_MSEC;
       break;
     default:
       break;
