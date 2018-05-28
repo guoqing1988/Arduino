@@ -420,6 +420,24 @@ void mode_expanding_boxes_loop()
   }
 }
 
+void show_white()
+{
+  int row, col;
+
+  uint32_t color = matrix.Color(255, 255, 255);
+  
+  // loop through all the leds
+  for(row = 0; row < MATRIX_HEIGHT; row++) {
+    for(col = 0; col < MATRIX_WIDTH; col++) {
+      // set the corresponding pixel color
+      matrix.drawPixel(col, row, color);
+    }
+  }
+          
+  // send the updated pixel colors to the NeoPixels
+  matrix.show();
+}
+
 void reset_screen_saver_timer()
 {
   // initialize the screen saver timeout
@@ -538,6 +556,7 @@ void loop()
       break;
     case MODE_EXPANDING_BOXES:
       mode_expanding_boxes_loop();
+      // show_white();
       delayLength = ANIMATE_DELAY_MSEC;
       break;
     default:
