@@ -24,6 +24,8 @@
 #include <Adafruit_GFX.h>
 #include <SparseNeoMatrix.h>
 #include <Adafruit_NeoPixel.h>
+#include <SPI.h>
+#include <SD.h>
 #ifdef __AVR__
   #include <avr/power.h>
 #endif
@@ -104,6 +106,10 @@ boolean anyPixelPressed = false;
 
 // delay between animation loops
 #define ANIMATE_DELAY_MSEC   100
+
+#define CHIP_SELECT_PIN 53
+
+File myFile;
 
 int ploadPin = 8;  // Connects to Parallel load pin the 165
 int clockEnablePin = 9;  // Connects to Clock Enable pin the 165
@@ -450,6 +456,30 @@ void setup()
 
   Serial.begin(9600);
 
+  Serial.print("Initializing SD card...");
+
+  if (!SD.begin(CHIP_SELECT_PIN)) {
+    Serial.println("initialization failed!");
+    return;
+  }
+  Serial.println("initialization done.");
+
+  // re-open the file for reading:
+  myFile = SD.open("test.txt");
+  if (myFile) {
+    Serial.println("test.txt:");
+
+    // read from the file until there's nothing else in it:
+    while (myFile.available()) {
+      Serial.write(myFile.read());
+    }
+    // close the file:
+    myFile.close();
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening test.txt");
+  }
+  
   // initialize the neoPixel matrix
   matrix.begin();
   
