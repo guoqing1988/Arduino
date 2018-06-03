@@ -47,6 +47,7 @@
 #define MODE_FADE            2
 #define MODE_WIPE            3
 #define MODE_EXPANDING_BOXES 4
+#define MODE_SCROLL_TEXT     5
 
 #define MODE_CHANGE_ROW (MATRIX_HEIGHT - 1)
 #define MODE_CHANGE_COL 0
@@ -56,7 +57,8 @@
 #define MODE_CYCLE_COL  2
 #define MODE_FADE_COL   3
 #define MODE_EXPANDING_BOXES_COL 4
-#define MODE_TIMER_COL  5
+#define MODE_SCROLL_TEXT_COL 5
+#define MODE_TIMER_COL  6
 
 unsigned char mode;
 
@@ -109,8 +111,6 @@ boolean anyPixelPressed = false;
 
 #define CHIP_SELECT_PIN 53
 
-File myFile;
-
 int ploadPin = 8;  // Connects to Parallel load pin the 165
 int clockEnablePin = 9;  // Connects to Clock Enable pin the 165
 int dataPin = 11; // Connects to the Q7 pin the 165
@@ -125,6 +125,14 @@ int animateCol = 0;
 int animateSize = 0;
 int animateWidth = 0;
 int animateHeight = 0;
+
+#define MAX_MESSAGE_LENGTH 127
+char message[MAX_MESSAGE_LENGTH + 1];
+unsigned int messageLength = 0;
+
+#define FONT_SIZE   2
+#define CHAR_WIDTH  (6 * FONT_SIZE)
+#define CHAR_HEIGHT (8 * FONT_SIZE)
 
 void clear(boolean clearBuffers)
 {
@@ -142,6 +150,19 @@ void clear(boolean clearBuffers)
   // clear the matrix
   matrix.clear();
   matrix.show();
+}
+
+void fillColor(uint32_t color)
+{
+  int row, col;
+
+  // loop through all the leds
+  for(row = 0; row < MATRIX_HEIGHT; row++) {
+    for(col = 0; col < MATRIX_WIDTH; col++) {
+      // set the corresponding pixel color
+      matrix.drawPixel(col, row, color);
+    }
+  }
 }
 
 void readSwitches()
@@ -426,6 +447,41 @@ void mode_expanding_boxes_loop()
   }
 }
 
+void mode_scroll_text_init()
+{
+  matrix.setTextWrap(false);
+  matrix.setTextSize(FONT_SIZE);
+
+  animateRow = 0;
+  animateCol = MATRIX_WIDTH;
+  animateWidth = CHAR_WIDTH * messageLength;
+  animateHeight = 1;
+  colorIndex = 1;
+  
+  mode = MODE_SCROLL_TEXT;
+}
+
+void mode_scroll_text_loop()
+{
+  fillColor(colors[0]);
+
+  matrix.setCursor(animateCol, 1);
+  matrix.setTextColor(colors[colorIndex]);
+  matrix.print(message);
+  matrix.show();
+
+  animateCol--;
+  if(animateCol < -(animateWidth)) {
+    animateCol = MATRIX_WIDTH;
+    colorIndex++;
+ 
+    // check to see if we have reached the end of all colors
+    if(colorIndex >= numColors) {
+      colorIndex = 1;
+    }
+  }
+}
+
 void show_white()
 {
   int row, col;
@@ -465,13 +521,12 @@ void setup()
   Serial.println("initialization done.");
 
   // re-open the file for reading:
-  myFile = SD.open("test.txt");
+  messageLength = 0;
+  File myFile = SD.open("test.txt");
   if (myFile) {
-    Serial.println("test.txt:");
-
     // read from the file until there's nothing else in it:
-    while (myFile.available()) {
-      Serial.write(myFile.read());
+    while(myFile.available() && (messageLength < MAX_MESSAGE_LENGTH)) {
+      message[messageLength++] = myFile.read();
     }
     // close the file:
     myFile.close();
@@ -479,7 +534,14 @@ void setup()
     // if the file didn't open, print an error:
     Serial.println("error opening test.txt");
   }
-  
+  message[messageLength] = '\0';
+
+  Serial.println("message:");
+  for(int i = 0; i < messageLength; i++) {
+    Serial.print(message[i]);
+  }
+  Serial.println();
+
   // initialize the neoPixel matrix
   matrix.begin();
   
@@ -536,6 +598,9 @@ void loop()
       else if(pixelPressed[MODE_EXPANDING_BOXES_COL][MODE_ROW] == true) {
         mode_expanding_boxes_init();
       }
+      else if(pixelPressed[MODE_SCROLL_TEXT_COL][MODE_ROW] == true) {
+        mode_scroll_text_init();
+      }
       else if(pixelPressed[MODE_CLEAR_COL][MODE_ROW] == true) {
         clear(true);
       }
@@ -563,9 +628,9 @@ void loop()
   else if(millis() >= screenSaverTimer) {
     reset_screen_saver_timer();
 
-    if(mode != MODE_EXPANDING_BOXES) {
-      mode_expanding_boxes_init();
-    }
+//    if(mode != MODE_EXPANDING_BOXES) {
+//      mode_expanding_boxes_init();
+//    }
   }
 
   delayLength = 0;
@@ -586,8 +651,10 @@ void loop()
       break;
     case MODE_EXPANDING_BOXES:
       mode_expanding_boxes_loop();
-      // show_white();
       delayLength = ANIMATE_DELAY_MSEC;
+      break;
+    case MODE_SCROLL_TEXT:
+      mode_scroll_text_loop();
       break;
     default:
       break;
