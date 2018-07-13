@@ -42,23 +42,20 @@
 #define MATRIX_WIDTH  SWITCHES_PER_ROW
 #define MATRIX_HEIGHT BOARD_ROWS
 
-#define MODE_COLOR_CYCLE     0
+#define MODE_CLEAR           0
 #define MODE_PAINT           1
-#define MODE_FADE            2
-#define MODE_WIPE            3
-#define MODE_EXPANDING_BOXES 4
-#define MODE_SCROLL_TEXT     5
+#define MODE_CYCLE           2
+#define MODE_SCROLL_TEXT     3
+#define MODE_SCREENSAVER     4
+#define MODE_FADE            5
+#define MODE_WIPE            6
+#define MODE_EXPANDING_BOXES 7
+#define MODE_COLOR_FABRIC    8
+#define MODE_TIMER           9
 
 #define MODE_CHANGE_ROW (MATRIX_HEIGHT - 1)
 #define MODE_CHANGE_COL 0
 #define MODE_ROW        0
-#define MODE_CLEAR_COL  0
-#define MODE_PAINT_COL  1
-#define MODE_CYCLE_COL  2
-#define MODE_FADE_COL   3
-#define MODE_EXPANDING_BOXES_COL 4
-#define MODE_SCROLL_TEXT_COL 5
-#define MODE_TIMER_COL  6
 
 unsigned char mode;
 
@@ -116,15 +113,17 @@ int clockEnablePin = 9;  // Connects to Clock Enable pin the 165
 int dataPin = 11; // Connects to the Q7 pin the 165
 int clockPin = 10; // Connects to the Clock pin the 165
 
-unsigned char fadeWheelIndex = 0;
+unsigned int fadeWheelIndex = 0;
 unsigned char numFadeLoops = 2;
 unsigned char fadeLoop = 0;
 
-int animateRow = 0;
-int animateCol = 0;
-int animateSize = 0;
-int animateWidth = 0;
-int animateHeight = 0;
+float animateRow = 0;
+float animateCol = 0;
+float animateSize = 0;
+float animateWidth = 0;
+float animateHeight = 0;
+float animateDx = 0;
+float animateDy = 0;
 
 #define MAX_MESSAGE_LENGTH 127
 char message[MAX_MESSAGE_LENGTH + 1];
@@ -211,14 +210,14 @@ void readSwitches()
   } /* end of rows */
 }
 
-void mode_color_cycle_init()
+void mode_cycle_init()
 {
   clear(false);
 
-  mode = MODE_COLOR_CYCLE;
+  mode = MODE_CYCLE;
 }
 
-void mode_color_cycle_loop()
+void mode_cycle_loop()
 {
   int row, col;
 
@@ -362,6 +361,84 @@ void mode_fade_loop()
   }
   else {
     fadeWheelIndex++;
+  }
+}
+
+void mode_color_fabric_init()
+{
+  clear(false);
+
+  fadeWheelIndex = 0;
+
+  // initiliaze the location where the central color is located
+  // other pixels will compute their color relative to this location
+  animateRow = MATRIX_HEIGHT / 2;
+  animateCol = MATRIX_WIDTH / 2;
+
+  animateDx = 0.5;
+  animateDy = 0.3;
+
+  // set a "size" that specifies the amount of color variation
+  // as a function of distance from the central color location.
+  // animateSize is in units of color wheelIndex per pixelDistance
+  // The Wheel function takes values from 0 to 255 to return a color.
+  // So, after computing the pixel distance, the current pixel color is computed as follows:
+  // wheelIndex = (centralColorWheelIndex + (pixelDistance * animateSize)) % 255;
+  animateSize = 6;
+  
+  mode = MODE_COLOR_FABRIC;
+}
+
+void mode_color_fabric_loop()
+{
+  int row, col;
+  int dx, dy;
+  float pixelDistance;
+  uint32_t color;
+  
+  // loop through all the leds
+  for(row = 0; row < MATRIX_HEIGHT; row++) {
+    for(col = 0; col < MATRIX_WIDTH; col++) {
+      // compute the distance from the central pixel location
+      dx = col - animateCol;
+      dy = row - animateRow;
+      pixelDistance = sqrt((dx*dx) + (dy*dy));
+
+      color = Wheel((fadeWheelIndex + (int) (pixelDistance * animateSize)) % 255);
+      
+      // set the corresponding pixel color
+      matrix.drawPixel(col, row, color);
+    }
+  }
+  
+  // send the updated pixel colors to the NeoPixels
+  matrix.show();
+
+  animateCol += animateDx;
+  if(animateCol <= 0) {
+    animateCol = 0;
+    animateDx = -animateDx;
+  }
+  else if(animateCol >= MATRIX_WIDTH) {
+    animateCol = MATRIX_WIDTH - 1;
+    animateDx = -animateDx;
+  }
+
+  animateRow += animateDy;
+  if(animateRow <= 0) {
+    animateRow = 0;
+    animateDy = -animateDy;
+  }
+  else if(animateRow >= MATRIX_HEIGHT) {
+    animateRow = MATRIX_HEIGHT - 1;
+    animateDy = -animateDy;
+  }
+  
+  // check to see if we have reached the end of the color wheel
+  fadeWheelIndex += 2;
+  if(fadeWheelIndex >= 255) {
+    // reset back to the first color in the color wheel
+    fadeWheelIndex = 0;
   }
 }
 
@@ -586,25 +663,28 @@ void loop()
 
     // check to see if this is a mode switch event
     if(pixelPressed[MODE_CHANGE_COL][MODE_CHANGE_ROW] == true) {
-      if(pixelPressed[MODE_CYCLE_COL][MODE_ROW] == true) {
-        mode_color_cycle_init();
+      if(pixelPressed[MODE_CYCLE][MODE_ROW] == true) {
+        mode_cycle_init();
       }
-      else if(pixelPressed[MODE_PAINT_COL][MODE_ROW] == true) {
+      else if(pixelPressed[MODE_PAINT][MODE_ROW] == true) {
         mode_paint_init();
       }
-      else if(pixelPressed[MODE_FADE_COL][MODE_ROW] == true) {
+      else if(pixelPressed[MODE_FADE][MODE_ROW] == true) {
         mode_fade_init();
       }
-      else if(pixelPressed[MODE_EXPANDING_BOXES_COL][MODE_ROW] == true) {
+      else if(pixelPressed[MODE_EXPANDING_BOXES][MODE_ROW] == true) {
         mode_expanding_boxes_init();
       }
-      else if(pixelPressed[MODE_SCROLL_TEXT_COL][MODE_ROW] == true) {
+      else if(pixelPressed[MODE_SCROLL_TEXT][MODE_ROW] == true) {
         mode_scroll_text_init();
       }
-      else if(pixelPressed[MODE_CLEAR_COL][MODE_ROW] == true) {
+      else if(pixelPressed[MODE_COLOR_FABRIC][MODE_ROW] == true) {
+        mode_color_fabric_init();
+      }
+      else if(pixelPressed[MODE_CLEAR][MODE_ROW] == true) {
         clear(true);
       }
-      else if((pixelPressed[MODE_TIMER_COL][MODE_ROW] == true) && (pixelPressedPrior[MODE_TIMER_COL][MODE_ROW] == false)) {
+      else if((pixelPressed[MODE_TIMER][MODE_ROW] == true) && (pixelPressedPrior[MODE_TIMER][MODE_ROW] == false)) {
         currentTime = millis();
         
         Serial.print("# loops = ");
@@ -635,8 +715,8 @@ void loop()
 
   delayLength = 0;
   switch(mode) {
-    case MODE_COLOR_CYCLE:
-      mode_color_cycle_loop();
+    case MODE_CYCLE:
+      mode_cycle_loop();
       delayLength = POLL_DELAY_MSEC;
       break;
     case MODE_PAINT:
@@ -655,6 +735,9 @@ void loop()
       break;
     case MODE_SCROLL_TEXT:
       mode_scroll_text_loop();
+      break;
+    case MODE_COLOR_FABRIC:
+      mode_color_fabric_loop();
       break;
     default:
       break;
