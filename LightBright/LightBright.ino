@@ -1,25 +1,8 @@
 /*
- * SN74HC165N_shift_reg
- *
- * Program to shift in the bit values from a SN74HC165N 8-bit
- * parallel-in/serial-out shift register.
- *
- * This sketch demonstrates reading in 16 digital states from a
- * pair of daisy-chained SN74HC165N shift registers while using
- * only 4 digital pins on the Arduino.
- *
- * You can daisy-chain these chips by connecting the serial-out
- * (Q7 pin) on one shift register to the serial-in (Ds pin) of
- * the other.
+ * Light Bright
  * 
- * Of course you can daisy chain as many as you like while still
- * using only 4 Arduino pins (though you would have to process
- * them 4 at a time into separate unsigned long variables).
- * 
+ * Author: Jeff Warren
 */
-
-// NeoPixel Ring simple sketch (c) 2013 Shae Erisson
-// released under the GPLv3 license to match the rest of the AdaFruit NeoPixel library
 
 #include <Adafruit_GFX.h>
 #include <SparseNeoMatrix.h>
@@ -31,8 +14,7 @@
 #endif
 
 // Which pin on the Arduino is connected to the NeoPixels?
-// On a Trinket or Gemma we suggest changing this to 1
-#define PIN            6
+#define PIN 6
 
 #define SWITCHES_PER_BOARD 8
 #define BOARDS_PER_ROW     4
@@ -59,32 +41,31 @@
 
 unsigned char mode;
 
-// define values for blinking leds
-#define BLINK_WHITE_TIMEOUT  200
-#define BLINK_COLOR_TIMEOUT  1500
-boolean blinkWhite = false;
-unsigned long blinkTimer = 0;
-
 // define values for the screen saver
 #define SCREEN_SAVER_TIMEOUT 10000
 unsigned long screenSaverTimer = 0;
 
 SparseNeoMatrix matrix = SparseNeoMatrix(MATRIX_WIDTH, MATRIX_HEIGHT, PIN);
 
-// colors is an array of colors that can be cycled for each pixel
-uint32_t colors[] = {
-  matrix.Color(0,0,0),      // black
-  matrix.Color(255,0,0),    // red
-  matrix.Color(0,255,0),    // green
-  matrix.Color(0,0,255),    // blue
-  matrix.Color(192,140,0),  // yellow
-  matrix.Color(128,0,128),  // purple
-  matrix.Color(255,100,0),  // orange
-  matrix.Color(84,84,84) // white
+// defined the predefined colors (in RGB space) used for color palletes
+#define NUM_COLORS 8
+struct RGBColor {
+  unsigned char red;
+  unsigned char green;
+  unsigned char blue;
+} rgb_colors[] = {
+  {   0,   0,   0 }, // black
+  { 255,   0,   0 }, // red
+  {   0, 255,   0 }, // green
+  {   0,   0, 255 }, // blue
+  { 192, 140,   0 }, // yellow
+  { 128,   0, 128 }, // purple
+  { 255, 100,   0 }, // orange
+  {  84,  84,  84 }  // white
 };
 
-// determine the number of colors in colors array
-unsigned char numColors = sizeof(colors) / sizeof(uint32_t);
+// declare an array that can hold the NeoPixel version of the predefined colors
+uint32_t colors[NUM_COLORS];
 
 // variable to hold the current color index (used for some modes)
 unsigned char colorIndex = 0;
@@ -96,6 +77,12 @@ unsigned char pixelColors[MATRIX_WIDTH][MATRIX_HEIGHT];
 boolean pixelPressed[MATRIX_WIDTH][MATRIX_HEIGHT];
 boolean pixelPressedPrior[MATRIX_WIDTH][MATRIX_HEIGHT];
 boolean anyPixelPressed = false;
+
+// only poll switches every so often as specified by numPollLoops
+// this helps to debounce the switches
+// pollLoop keeps track of the loop number we are currently on
+unsigned int numPollLoops = 2;
+unsigned int pollLoop = 0;
 
 // Width of pulse to trigger the shift register to read and latch.
 #define PULSE_WIDTH_USEC   5
@@ -112,6 +99,15 @@ int ploadPin = 8;  // Connects to Parallel load pin the 165
 int clockEnablePin = 9;  // Connects to Clock Enable pin the 165
 int dataPin = 11; // Connects to the Q7 pin the 165
 int clockPin = 10; // Connects to the Clock pin the 165
+
+// selectedColorIndex holds the currently selected color for each of the two paint palettes
+unsigned char selectedColorIndex[] {
+  1, 1
+};
+
+int selectedColorBlinkIndex = 0;
+#define NUM_BLINK_LOOPS 100
+#define NUM_FADE_LOOPS   25
 
 unsigned int fadeWheelIndex = 0;
 unsigned char numFadeLoops = 2;
@@ -227,7 +223,7 @@ void mode_cycle_loop()
       if((pixelPressedPrior[col][row] == false) && (pixelPressed[col][row] == true)) {
         // increment the color for this pixel
         pixelColors[col][row] += 1;
-        if(pixelColors[col][row] >= numColors) {
+        if(pixelColors[col][row] >= NUM_COLORS) {
             pixelColors[col][row] = 0;
         }
       }
@@ -246,46 +242,65 @@ void mode_paint_init()
 {
   clear(false);
 
-  colorIndex = 1;
-
-  blinkWhite = true;
-  blinkTimer = millis() + BLINK_WHITE_TIMEOUT;
+  selectedColorBlinkIndex = 0;
 
   mode = MODE_PAINT;
 }
 
 void mode_paint_loop()
 {
-  int row, col;
+  int i, row, col;
+  unsigned int red, green, blue;
+  float colorPercent;
 
-  // check to see if the blink alarm needs to be updated
-  if(millis() >= blinkTimer) {
-    if(blinkWhite) {
-      blinkWhite = false;
-      blinkTimer = millis() + BLINK_COLOR_TIMEOUT;
-    }
-    else {
-      blinkWhite = true;
-      blinkTimer = millis() + BLINK_WHITE_TIMEOUT;
-    }
-  }
-
-  // paint the last row of leds with the color pallette
+  // paint the last row of leds with both color palettes
   row = MATRIX_HEIGHT - 1;
-  for(col = 0; ((col < numColors) && (col < MATRIX_WIDTH)); col++) { 
-    if((blinkWhite) && (colorIndex == col)) {
-      matrix.drawPixel(col, row, matrix.Color(192,192,192));
-    }
-    else {
-      matrix.drawPixel(col, row, colors[col]);
-    }
+  for(i = 0; i < 2; i++) {
+    // compute the starting column location of this color palette
+    col = (MATRIX_WIDTH / 2) * i;
 
-    // check to see if this switch is pressed
-    if(pixelPressed[col][row] == true) {
-      colorIndex = col;
+    // draw the current color palette
+    for(colorIndex = 0; colorIndex < NUM_COLORS; colorIndex++, col++) {
+      // make this the selected color if this pixel was just pressed
+      if((pixelPressed[col][row]) && (pixelPressedPrior[col][row] == false)) {
+        selectedColorIndex[i] = colorIndex;
 
-      blinkWhite = true;
-      blinkTimer = millis() + BLINK_WHITE_TIMEOUT;
+        selectedColorBlinkIndex = 0;
+      }
+
+      // if this is the currently selected color, compute it's color as a fading blink
+      if(colorIndex == selectedColorIndex[i]) {
+        colorPercent = selectedColorBlinkIndex / (float) NUM_FADE_LOOPS;
+        if(colorPercent > 1) {
+          colorPercent = 1;
+        }
+        else if(colorPercent < 0) {
+          colorPercent = 0;
+        }
+
+        // if the colorIndex is 0 (black), have the color computed as a fade out from white to black,
+        // otherwise, have the color computed as a fade up from black to the selected color
+        if(colorIndex == 0) {
+          red = 255 * (1 - colorPercent);
+          green = 255 * (1 - colorPercent);
+          blue = 255 * (1 - colorPercent);
+        }
+        else {
+          red = rgb_colors[colorIndex].red * colorPercent;
+          green = rgb_colors[colorIndex].green * colorPercent;
+          blue = rgb_colors[colorIndex].blue * colorPercent;
+        }
+            
+        matrix.drawPixel(col, row, matrix.Color(red, green, blue));
+
+        selectedColorBlinkIndex++;
+        if(selectedColorBlinkIndex >= NUM_BLINK_LOOPS) {
+          selectedColorBlinkIndex = 0;
+        }
+      }
+      else {
+        matrix.drawPixel(col, row, colors[colorIndex]);
+      }
     }
   }
 
@@ -295,7 +310,12 @@ void mode_paint_loop()
       // check to see if this is a rising edge on this switch
       if((pixelPressedPrior[col][row] == false) && (pixelPressed[col][row] == true)) {
         // set the corresponding pixel color
-        matrix.drawPixel(col, row, colors[colorIndex]);
+        if(col < (MATRIX_WIDTH / 2)) {
+          matrix.drawPixel(col, row, colors[selectedColorIndex[0]]);
+        }
+        else {
+          matrix.drawPixel(col, row, colors[selectedColorIndex[1]]);
+        }
       }
     }
   }
@@ -474,7 +494,7 @@ void mode_wipe_loop()
       animateRow = 0;
 
       // check to see if we have reached the end of all colors
-      if(colorIndex >= numColors) {
+      if(colorIndex >= NUM_COLORS) {
         colorIndex = 1;
 
         // switch to fade mode
@@ -518,7 +538,7 @@ void mode_expanding_boxes_loop()
     colorIndex++;
 
     // check to see if we have reached the end of all colors
-    if(colorIndex >= numColors) {
+    if(colorIndex >= NUM_COLORS) {
       colorIndex = 1;
     }
   }
@@ -553,7 +573,7 @@ void mode_scroll_text_loop()
     colorIndex++;
  
     // check to see if we have reached the end of all colors
-    if(colorIndex >= numColors) {
+    if(colorIndex >= NUM_COLORS) {
       colorIndex = 1;
     }
   }
@@ -585,9 +605,14 @@ void reset_screen_saver_timer()
 
 void setup()
 {
-  int col, row;
+  int i, col, row;
 
   Serial.begin(9600);
+
+  // initialize the array of colors
+  for(i = 0; i < NUM_COLORS; i++) {
+    colors[i] = matrix.Color(rgb_colors[i].red, rgb_colors[i].green, rgb_colors[i].blue);
+  }
 
   Serial.print("Initializing SD card...");
 
@@ -655,73 +680,70 @@ void loop()
   unsigned int delayLength;
   
   // read the new switch values
-  readSwitches();
+  pollLoop++;
+  if(pollLoop >= numPollLoops) {
+    readSwitches();
+    pollLoop = 0;
  
-  if(anyPixelPressed) {
-    // reset the screen saver timer
-    reset_screen_saver_timer();
-
-    // check to see if this is a mode switch event
-    if(pixelPressed[MODE_CHANGE_COL][MODE_CHANGE_ROW] == true) {
-      if(pixelPressed[MODE_CYCLE][MODE_ROW] == true) {
-        mode_cycle_init();
-      }
-      else if(pixelPressed[MODE_PAINT][MODE_ROW] == true) {
-        mode_paint_init();
-      }
-      else if(pixelPressed[MODE_FADE][MODE_ROW] == true) {
-        mode_fade_init();
-      }
-      else if(pixelPressed[MODE_EXPANDING_BOXES][MODE_ROW] == true) {
-        mode_expanding_boxes_init();
-      }
-      else if(pixelPressed[MODE_SCROLL_TEXT][MODE_ROW] == true) {
-        mode_scroll_text_init();
-      }
-      else if(pixelPressed[MODE_COLOR_FABRIC][MODE_ROW] == true) {
-        mode_color_fabric_init();
-      }
-      else if(pixelPressed[MODE_CLEAR][MODE_ROW] == true) {
-        clear(true);
-      }
-      else if((pixelPressed[MODE_TIMER][MODE_ROW] == true) && (pixelPressedPrior[MODE_TIMER][MODE_ROW] == false)) {
-        currentTime = millis();
-        
-        Serial.print("# loops = ");
-        Serial.print(numLoops);
-        Serial.print(" duration = ");
-        Serial.print(currentTime - timerStart);
-        Serial.print(" avg loop time = ");
-        Serial.println((currentTime - timerStart) / (double) numLoops);
+    if(anyPixelPressed) {
+      // reset the screen saver timer
+      reset_screen_saver_timer();
   
-        numLoops = 0;
-        timerStart = currentTime;
+      // check to see if this is a mode switch event
+      if(pixelPressed[MODE_CHANGE_COL][MODE_CHANGE_ROW] == true) {
+        if(pixelPressed[MODE_CYCLE][MODE_ROW] == true) {
+          mode_cycle_init();
+        }
+        else if(pixelPressed[MODE_PAINT][MODE_ROW] == true) {
+          mode_paint_init();
+        }
+        else if(pixelPressed[MODE_FADE][MODE_ROW] == true) {
+          mode_fade_init();
+        }
+        else if(pixelPressed[MODE_EXPANDING_BOXES][MODE_ROW] == true) {
+          mode_expanding_boxes_init();
+        }
+        else if(pixelPressed[MODE_SCROLL_TEXT][MODE_ROW] == true) {
+          mode_scroll_text_init();
+        }
+        else if(pixelPressed[MODE_COLOR_FABRIC][MODE_ROW] == true) {
+          mode_color_fabric_init();
+        }
+        else if(pixelPressed[MODE_CLEAR][MODE_ROW] == true) {
+          clear(true);
+        }
+        else if((pixelPressed[MODE_TIMER][MODE_ROW] == true) && (pixelPressedPrior[MODE_TIMER][MODE_ROW] == false)) {
+          currentTime = millis();
+          
+          Serial.print("# loops = ");
+          Serial.print(numLoops);
+          Serial.print(" duration = ");
+          Serial.print(currentTime - timerStart);
+          Serial.print(" avg loop time = ");
+          Serial.println((currentTime - timerStart) / (double) numLoops);
+    
+          numLoops = 0;
+          timerStart = currentTime;
+        }
       }
-    }
-    else {
-      // if the screen saver was active, and this is a pixel press, then switch to paint mode
-      if(mode == MODE_EXPANDING_BOXES) {
-        mode_paint_init();
+      else {
+        // if the screen saver was active, and this is a pixel press, then switch to paint mode
+        if(mode == MODE_EXPANDING_BOXES) {
+          mode_paint_init();
+        }
       }
     }
   }
   else if(millis() >= screenSaverTimer) {
     reset_screen_saver_timer();
-
-//    if(mode != MODE_EXPANDING_BOXES) {
-//      mode_expanding_boxes_init();
-//    }
   }
 
-  delayLength = 0;
   switch(mode) {
     case MODE_CYCLE:
       mode_cycle_loop();
-      delayLength = POLL_DELAY_MSEC;
       break;
     case MODE_PAINT:
       mode_paint_loop();
-      delayLength = POLL_DELAY_MSEC;
       break;
     case MODE_FADE:
       mode_fade_loop();
@@ -731,7 +753,6 @@ void loop()
       break;
     case MODE_EXPANDING_BOXES:
       mode_expanding_boxes_loop();
-      delayLength = ANIMATE_DELAY_MSEC;
       break;
     case MODE_SCROLL_TEXT:
       mode_scroll_text_loop();
