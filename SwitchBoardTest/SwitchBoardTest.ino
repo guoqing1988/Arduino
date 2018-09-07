@@ -23,7 +23,7 @@ boolean pixelPressedPrior[NUM_PIXELS];
 int ploadPin        = 8;  // Connects to Parallel load pin the 165
 int clockEnablePin  = 9;  // Connects to Clock Enable pin the 165
 int dataPin         = 11; // Connects to the Q7 pin the 165
-int clockPin        = 12; // Connects to the Clock pin the 165
+int clockPin        = 10; // Connects to the Clock pin the 165
 
 void readSwitches()
 {

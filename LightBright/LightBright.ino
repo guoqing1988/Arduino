@@ -59,9 +59,9 @@ struct RGBColor {
   {   0, 255,   0 }, // green
   {   0,   0, 255 }, // blue
   { 192, 140,   0 }, // yellow
-  { 128,   0, 128 }, // purple
+  { 192,   0, 192 }, // purple
   { 255, 100,   0 }, // orange
-  {  84,  84,  84 }  // white
+  { 255, 255, 255 }  // white
 };
 
 // declare an array that can hold the NeoPixel version of the predefined colors
@@ -81,7 +81,7 @@ boolean anyPixelPressed = false;
 // only poll switches every so often as specified by numPollLoops
 // this helps to debounce the switches
 // pollLoop keeps track of the loop number we are currently on
-unsigned int numPollLoops = 2;
+unsigned int numPollLoops = 4;
 unsigned int pollLoop = 0;
 
 // Width of pulse to trigger the shift register to read and latch.
@@ -577,6 +577,16 @@ void mode_scroll_text_loop()
       colorIndex = 1;
     }
   }
+}
+
+void mode_screensaver_init()
+{
+  
+}
+
+void mode_screensaver_loop()
+{
+  
 }
 
 void show_white()
