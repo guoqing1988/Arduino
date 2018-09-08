@@ -48,6 +48,31 @@ unsigned long screenSaverTimer = 0;
 SparseNeoMatrix matrix = SparseNeoMatrix(MATRIX_WIDTH, MATRIX_HEIGHT, PIN);
 
 // defined the predefined colors (in RGB space) used for color palletes
+#define NUM_COLORS 16
+struct RGBColor {
+  unsigned char red;
+  unsigned char green;
+  unsigned char blue;
+} rgb_colors[] = {
+  { 255,   0,   0 }, // red
+  { 102,   0,   0 }, // ruby red (darker)
+  { 255, 102,   0 }, // orange
+  { 204, 102,  51 }, // red brown
+  { 255, 255,   0 }, // yellow
+  { 204, 255, 102 }, // moon green
+  {   0, 255,   0 }, // green
+  {   0, 102,  51 }, // forest green
+  { 102, 102, 204 }, // twilight blue
+  {   0,   0, 255 }, // blue
+  { 204, 102, 255 }, // light purple
+  { 153,   0, 153 }, // deep violet
+  { 255,  51, 153 }, // hot pink
+  { 255, 255, 255 }, // white
+  {  77,  77,  77 }, // 70% black
+  {   0,   0,   0 }  // black
+};
+
+/*
 #define NUM_COLORS 8
 struct RGBColor {
   unsigned char red;
@@ -63,6 +88,7 @@ struct RGBColor {
   { 255, 100,   0 }, // orange
   { 255, 255, 255 }  // white
 };
+*/
 
 // declare an array that can hold the NeoPixel version of the predefined colors
 uint32_t colors[NUM_COLORS];
@@ -104,7 +130,7 @@ int clockPin = 10; // Connects to the Clock pin the 165
 
 // selectedColorIndex holds the currently selected color for each of the two paint palettes
 unsigned char selectedColorIndex[] {
-  1, 1
+  0, 0
 };
 
 int selectedColorBlinkIndex = 0;
@@ -139,7 +165,7 @@ void clear(boolean clearBuffers)
     // initialize the color indexes for each pixel
     for(row = 0; row < MATRIX_HEIGHT; row++) {
       for(col = 0; col < MATRIX_WIDTH; col++) {
-        pixelColors[col][row] = 0;
+        pixelColors[col][row] = NUM_COLORS - 1;
       }
     }
   }
@@ -296,9 +322,11 @@ void mode_paint_loop()
           colorPercent = 0;
         }
 
-        // if the colorIndex is 0 (black), have the color computed as a fade out from white to black,
+        // if the colorIndex is set to black, have the color computed as a fade out from white to black,
         // otherwise, have the color computed as a fade up from black to the selected color
-        if(colorIndex == 0) {
+        if((rgb_colors[colorIndex].red == 0) &&
+           (rgb_colors[colorIndex].green == 0) &&
+           (rgb_colors[colorIndex].blue == 0)) {
           red = 255 * (1 - colorPercent);
           green = 255 * (1 - colorPercent);
           blue = 255 * (1 - colorPercent);
@@ -459,7 +487,7 @@ boolean mode_scroll_text_loop()
 {
   boolean finishStatus = false;
   
-  fillColor(colors[0]);
+  fillColor(colors[NUM_COLORS - 1]);
 
   matrix.setCursor(animateCol, 1);
   matrix.setTextColor(colors[colorIndex]);
@@ -472,8 +500,8 @@ boolean mode_scroll_text_loop()
     colorIndex++;
  
     // check to see if we have reached the end of all colors
-    if(colorIndex >= NUM_COLORS) {
-      colorIndex = 1;
+    if(colorIndex >= (NUM_COLORS - 1)) {
+      colorIndex = 0;
     }
 
     finishStatus = true;
@@ -493,7 +521,7 @@ void mode_screensaver_init()
 void mode_screensaver_loop()
 {
   boolean finishStatus;
-  static int textColorIndex = 1;
+  static int textColorIndex = 0;
   static int subMode = MODE_COLOR_FABRIC;
 
   if(subMode == MODE_COLOR_FABRIC) {
@@ -503,8 +531,8 @@ void mode_screensaver_loop()
   
       // update the color index for the next time the text starts
       textColorIndex++;
-      if(textColorIndex >= NUM_COLORS) {
-        textColorIndex = 1;
+      if(textColorIndex >= (NUM_COLORS - 1)) {
+        textColorIndex = 0;
       }
   
       mode = MODE_SCREENSAVER;
@@ -623,7 +651,7 @@ void loop()
           mode_paint_init();
         }
         else if(pixelPressed[MODE_SCROLL_TEXT][MODE_ROW] == true) {
-          mode_scroll_text_init(1);
+          mode_scroll_text_init(0);
         }
         else if(pixelPressed[MODE_COLOR_FABRIC][MODE_ROW] == true) {
           mode_color_fabric_init();
