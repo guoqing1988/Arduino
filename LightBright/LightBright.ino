@@ -26,14 +26,10 @@
 
 #define MODE_CLEAR           0
 #define MODE_PAINT           1
-#define MODE_CYCLE           2
-#define MODE_SCROLL_TEXT     3
-#define MODE_SCREENSAVER     4
-#define MODE_FADE            5
-#define MODE_WIPE            6
-#define MODE_EXPANDING_BOXES 7
-#define MODE_COLOR_FABRIC    8
-#define MODE_TIMER           9
+#define MODE_SCROLL_TEXT     2
+#define MODE_COLOR_FABRIC    3
+#define MODE_CYCLE           4
+#define MODE_SCREENSAVER     5
 
 #define MODE_CHANGE_ROW (MATRIX_HEIGHT - 1)
 #define MODE_CHANGE_COL 0
@@ -42,7 +38,11 @@
 unsigned char mode;
 
 // define values for the screen saver
-#define SCREEN_SAVER_TIMEOUT 10000
+// millis appears to be unreliable as a timer
+// testing indicates about 22 seconds for 4000 millis
+// therefore, update the SCREEN_SAVER_SECONDS value and let the macro compute the millis timer
+#define SCREEN_SAVER_SECONDS 180
+#define SCREEN_SAVER_TIMEOUT ((unsigned long) ((4000.0 / 22.0) * SCREEN_SAVER_SECONDS))
 unsigned long screenSaverTimer = 0;
 
 SparseNeoMatrix matrix = SparseNeoMatrix(MATRIX_WIDTH, MATRIX_HEIGHT, PIN);
@@ -93,12 +93,14 @@ unsigned int pollLoop = 0;
 // delay between animation loops
 #define ANIMATE_DELAY_MSEC   100
 
-#define CHIP_SELECT_PIN 53
-
 int ploadPin = 8;  // Connects to Parallel load pin the 165
 int clockEnablePin = 9;  // Connects to Clock Enable pin the 165
 int dataPin = 11; // Connects to the Q7 pin the 165
 int clockPin = 10; // Connects to the Clock pin the 165
+
+// SD card definitions
+#define SDCARD_CHIP_SELECT_PIN  53
+#define SDCARD_MESSAGE_FILENAME "message.txt"
 
 // selectedColorIndex holds the currently selected color for each of the two paint palettes
 unsigned char selectedColorIndex[] {
@@ -158,6 +160,12 @@ void fillColor(uint32_t color)
       matrix.drawPixel(col, row, color);
     }
   }
+}
+
+void reset_screen_saver_timer()
+{
+  // initialize the screen saver timeout
+  screenSaverTimer = millis() + SCREEN_SAVER_TIMEOUT;
 }
 
 void readSwitches()
@@ -240,7 +248,17 @@ void mode_cycle_loop()
 
 void mode_paint_init()
 {
+  int row, col;
+  
   clear(false);
+
+  // initialize the colors for each pixel
+  for(row = 0; row < MATRIX_HEIGHT; row++) {
+    for(col = 0; col < MATRIX_WIDTH; col++) {
+      matrix.drawPixel(col, row, colors[pixelColors[col][row]]);
+    }
+  }
+  matrix.show();
 
   selectedColorBlinkIndex = 0;
 
@@ -311,11 +329,12 @@ void mode_paint_loop()
       if((pixelPressedPrior[col][row] == false) && (pixelPressed[col][row] == true)) {
         // set the corresponding pixel color
         if(col < (MATRIX_WIDTH / 2)) {
-          matrix.drawPixel(col, row, colors[selectedColorIndex[0]]);
+          pixelColors[col][row] = selectedColorIndex[0];
         }
         else {
-          matrix.drawPixel(col, row, colors[selectedColorIndex[1]]);
+          pixelColors[col][row] = selectedColorIndex[1];
         }
+        matrix.drawPixel(col, row, colors[pixelColors[col][row]]);
       }
     }
   }
@@ -337,51 +356,6 @@ uint32_t Wheel(byte WheelPos) {
   }
   WheelPos -= 170;
   return matrix.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
-}
-
-void mode_fade_init()
-{
-  clear(false);
-
-  fadeWheelIndex = 0;
-  fadeLoop = 0;
-  
-  mode = MODE_FADE;
-}
-
-void mode_fade_loop()
-{
-  int row, col;
-
-  uint32_t color = Wheel(fadeWheelIndex);
-  
-  // loop through all the leds
-  for(row = 0; row < MATRIX_HEIGHT; row++) {
-    for(col = 0; col < MATRIX_WIDTH; col++) {
-      // set the corresponding pixel color
-      matrix.drawPixel(col, row, color);
-    }
-  }
-          
-  // send the updated pixel colors to the NeoPixels
-  matrix.show();
-
-  // check to see if we have reached the end of the color wheel
-  if(fadeWheelIndex == 255) {
-    // reset back to the first color in the color wheel
-    fadeWheelIndex = 0;
-
-    // increment the fade loop count
-    fadeLoop++;
-
-    // if we have reached the maximum number of fade loops, switch to wipe mode
-    if(fadeLoop >= numFadeLoops) {
-      mode_wipe_init();
-    }
-  }
-  else {
-    fadeWheelIndex++;
-  }
 }
 
 void mode_color_fabric_init()
@@ -409,12 +383,13 @@ void mode_color_fabric_init()
   mode = MODE_COLOR_FABRIC;
 }
 
-void mode_color_fabric_loop()
+boolean mode_color_fabric_loop()
 {
   int row, col;
   int dx, dy;
   float pixelDistance;
   uint32_t color;
+  boolean finishStatus = false;
   
   // loop through all the leds
   for(row = 0; row < MATRIX_HEIGHT; row++) {
@@ -459,92 +434,13 @@ void mode_color_fabric_loop()
   if(fadeWheelIndex >= 255) {
     // reset back to the first color in the color wheel
     fadeWheelIndex = 0;
+    finishStatus = true;
   }
+
+  return finishStatus;
 }
 
-void mode_wipe_init()
-{
-  clear(false);
-
-  animateRow = 0;
-  animateCol = 0;
-  colorIndex = 1;
-  
-  mode = MODE_WIPE;
-}
-
-void mode_wipe_loop()
-{
-  matrix.drawPixel(animateCol, animateRow, colors[colorIndex]);
-  matrix.show();
-
-  // increment the column index for the current row
-  animateCol++;
-
-  // check to see if we have reached the end of the row
-  if(animateCol >= MATRIX_WIDTH) {
-    animateRow++;
-    animateCol = 0;
-
-    // check to see if we have reached the end of all rows
-    if(animateRow >= MATRIX_HEIGHT) {
-      // increment the color index
-      colorIndex++;
-
-      animateRow = 0;
-
-      // check to see if we have reached the end of all colors
-      if(colorIndex >= NUM_COLORS) {
-        colorIndex = 1;
-
-        // switch to fade mode
-        mode_fade_init();
-      }
-    }
-  }
-}
-
-void mode_expanding_boxes_init()
-{
-  animateRow = (MATRIX_HEIGHT / 2) - 1;
-  animateCol = (MATRIX_WIDTH / 2) - 1;
-  animateWidth = 2;
-  animateHeight = 2;
-  colorIndex = 1;
-  
-  mode = MODE_EXPANDING_BOXES;
-}
-
-void mode_expanding_boxes_loop()
-{
-  matrix.clear();
-  matrix.drawRect(animateCol, animateRow, animateWidth, animateHeight, colors[colorIndex]);
-  matrix.show();
-
-  // increment the column index for the current row
-  animateCol -= 2;
-  animateRow--;
-  animateWidth += 4;
-  animateHeight += 2;
-
-  // check to see if we have reached the end of the row
-  if(animateRow < 0) {
-    animateRow = (MATRIX_HEIGHT / 2) - 1;
-    animateCol = (MATRIX_WIDTH / 2) - 1;
-    animateWidth = 2;
-    animateHeight = 2;
-
-    // increment the color index
-    colorIndex++;
-
-    // check to see if we have reached the end of all colors
-    if(colorIndex >= NUM_COLORS) {
-      colorIndex = 1;
-    }
-  }
-}
-
-void mode_scroll_text_init()
+void mode_scroll_text_init(int startingIndex)
 {
   matrix.setTextWrap(false);
   matrix.setTextSize(FONT_SIZE);
@@ -553,13 +449,16 @@ void mode_scroll_text_init()
   animateCol = MATRIX_WIDTH;
   animateWidth = CHAR_WIDTH * messageLength;
   animateHeight = 1;
-  colorIndex = 1;
+
+  colorIndex = startingIndex;
   
   mode = MODE_SCROLL_TEXT;
 }
 
-void mode_scroll_text_loop()
+boolean mode_scroll_text_loop()
 {
+  boolean finishStatus = false;
+  
   fillColor(colors[0]);
 
   matrix.setCursor(animateCol, 1);
@@ -576,41 +475,89 @@ void mode_scroll_text_loop()
     if(colorIndex >= NUM_COLORS) {
       colorIndex = 1;
     }
+
+    finishStatus = true;
   }
+
+  return finishStatus;
 }
 
 void mode_screensaver_init()
 {
-  
+  mode_color_fabric_init();
+
+  mode = MODE_SCREENSAVER;
+  reset_screen_saver_timer();
 }
 
 void mode_screensaver_loop()
 {
-  
-}
+  boolean finishStatus;
+  static int textColorIndex = 1;
+  static int subMode = MODE_COLOR_FABRIC;
 
-void show_white()
-{
-  int row, col;
-
-  uint32_t color = matrix.Color(255, 255, 255);
+  if(subMode == MODE_COLOR_FABRIC) {
+    finishStatus = mode_color_fabric_loop();
+    if(finishStatus) {
+      mode_scroll_text_init(textColorIndex);
   
-  // loop through all the leds
-  for(row = 0; row < MATRIX_HEIGHT; row++) {
-    for(col = 0; col < MATRIX_WIDTH; col++) {
-      // set the corresponding pixel color
-      matrix.drawPixel(col, row, color);
+      // update the color index for the next time the text starts
+      textColorIndex++;
+      if(textColorIndex >= NUM_COLORS) {
+        textColorIndex = 1;
+      }
+  
+      mode = MODE_SCREENSAVER;
+      subMode = MODE_SCROLL_TEXT;
     }
   }
-          
-  // send the updated pixel colors to the NeoPixels
-  matrix.show();
+  else {
+    finishStatus = mode_scroll_text_loop();
+    if(finishStatus) {
+      mode_color_fabric_init();
+
+      mode = MODE_SCREENSAVER;
+      subMode = MODE_COLOR_FABRIC;
+    }
+  }
 }
 
-void reset_screen_saver_timer()
+void SD_card_init()
 {
-  // initialize the screen saver timeout
-  screenSaverTimer = millis() + SCREEN_SAVER_TIMEOUT;
+  messageLength = 0;
+  message[messageLength] = '\0';
+
+  Serial.print("Initializing SD card...");
+
+  if (!SD.begin(SDCARD_CHIP_SELECT_PIN)) {
+    Serial.println("initialization failed!");
+    return;
+  }
+
+  Serial.println("opening message file...");
+
+  // re-open the file for reading:
+  File myFile = SD.open(SDCARD_MESSAGE_FILENAME);
+  if (myFile) {
+    // read from the file until there's nothing else in it:
+    while(myFile.available() && (messageLength < MAX_MESSAGE_LENGTH)) {
+      message[messageLength++] = myFile.read();
+    }
+    message[messageLength] = '\0';
+
+    // close the file:
+    myFile.close();
+  } else {
+    // if the file didn't open, print an error:
+    Serial.print("error opening file: ");
+    Serial.println(SDCARD_MESSAGE_FILENAME);
+  }
+
+  Serial.println("message: ");
+  for(int i = 0; i < messageLength; i++) {
+    Serial.print(message[i]);
+  }
+  Serial.println();
 }
 
 void setup()
@@ -619,40 +566,13 @@ void setup()
 
   Serial.begin(9600);
 
+  // initialize the SD card
+  SD_card_init();
+  
   // initialize the array of colors
   for(i = 0; i < NUM_COLORS; i++) {
     colors[i] = matrix.Color(rgb_colors[i].red, rgb_colors[i].green, rgb_colors[i].blue);
   }
-
-  Serial.print("Initializing SD card...");
-
-  if (!SD.begin(CHIP_SELECT_PIN)) {
-    Serial.println("initialization failed!");
-    return;
-  }
-  Serial.println("initialization done.");
-
-  // re-open the file for reading:
-  messageLength = 0;
-  File myFile = SD.open("test.txt");
-  if (myFile) {
-    // read from the file until there's nothing else in it:
-    while(myFile.available() && (messageLength < MAX_MESSAGE_LENGTH)) {
-      message[messageLength++] = myFile.read();
-    }
-    // close the file:
-    myFile.close();
-  } else {
-    // if the file didn't open, print an error:
-    Serial.println("error opening test.txt");
-  }
-  message[messageLength] = '\0';
-
-  Serial.println("message:");
-  for(int i = 0; i < messageLength; i++) {
-    Serial.print(message[i]);
-  }
-  Serial.println();
 
   // initialize the neoPixel matrix
   matrix.begin();
@@ -684,11 +604,6 @@ void setup()
 
 void loop()
 {
-  static unsigned long numLoops = 0;
-  static unsigned long timerStart = millis();
-  unsigned long currentTime;
-  unsigned int delayLength;
-  
   // read the new switch values
   pollLoop++;
   if(pollLoop >= numPollLoops) {
@@ -701,68 +616,40 @@ void loop()
   
       // check to see if this is a mode switch event
       if(pixelPressed[MODE_CHANGE_COL][MODE_CHANGE_ROW] == true) {
-        if(pixelPressed[MODE_CYCLE][MODE_ROW] == true) {
-          mode_cycle_init();
+        if(pixelPressed[MODE_CLEAR][MODE_ROW] == true) {
+          clear(true);
         }
         else if(pixelPressed[MODE_PAINT][MODE_ROW] == true) {
           mode_paint_init();
         }
-        else if(pixelPressed[MODE_FADE][MODE_ROW] == true) {
-          mode_fade_init();
-        }
-        else if(pixelPressed[MODE_EXPANDING_BOXES][MODE_ROW] == true) {
-          mode_expanding_boxes_init();
-        }
         else if(pixelPressed[MODE_SCROLL_TEXT][MODE_ROW] == true) {
-          mode_scroll_text_init();
+          mode_scroll_text_init(1);
         }
         else if(pixelPressed[MODE_COLOR_FABRIC][MODE_ROW] == true) {
           mode_color_fabric_init();
         }
-        else if(pixelPressed[MODE_CLEAR][MODE_ROW] == true) {
-          clear(true);
+        else if(pixelPressed[MODE_CYCLE][MODE_ROW] == true) {
+          mode_cycle_init();
         }
-        else if((pixelPressed[MODE_TIMER][MODE_ROW] == true) && (pixelPressedPrior[MODE_TIMER][MODE_ROW] == false)) {
-          currentTime = millis();
-          
-          Serial.print("# loops = ");
-          Serial.print(numLoops);
-          Serial.print(" duration = ");
-          Serial.print(currentTime - timerStart);
-          Serial.print(" avg loop time = ");
-          Serial.println((currentTime - timerStart) / (double) numLoops);
-    
-          numLoops = 0;
-          timerStart = currentTime;
+        else if(pixelPressed[MODE_SCREENSAVER][MODE_ROW] == true) {
+          mode_screensaver_init();
         }
       }
       else {
         // if the screen saver was active, and this is a pixel press, then switch to paint mode
-        if(mode == MODE_EXPANDING_BOXES) {
+        if(mode == MODE_SCREENSAVER) {
           mode_paint_init();
         }
       }
     }
   }
-  else if(millis() >= screenSaverTimer) {
-    reset_screen_saver_timer();
+  else if((millis() >= screenSaverTimer) && (mode == MODE_PAINT)) {
+    mode_screensaver_init();
   }
 
   switch(mode) {
-    case MODE_CYCLE:
-      mode_cycle_loop();
-      break;
     case MODE_PAINT:
       mode_paint_loop();
-      break;
-    case MODE_FADE:
-      mode_fade_loop();
-      break;
-    case MODE_WIPE:
-      mode_wipe_loop();
-      break;
-    case MODE_EXPANDING_BOXES:
-      mode_expanding_boxes_loop();
       break;
     case MODE_SCROLL_TEXT:
       mode_scroll_text_loop();
@@ -770,12 +657,14 @@ void loop()
     case MODE_COLOR_FABRIC:
       mode_color_fabric_loop();
       break;
+    case MODE_CYCLE:
+      mode_cycle_loop();
+      break;
+    case MODE_SCREENSAVER:
+      mode_screensaver_loop();
+      break;
     default:
       break;
   }
-
-  numLoops++;
-  
-  delay(delayLength);
 }
 
