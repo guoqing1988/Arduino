@@ -72,26 +72,20 @@ struct RGBColor {
   {   0,   0,   0 }  // black
 };
 
-/*
-#define NUM_COLORS 8
-struct RGBColor {
+#define NUM_TEXT_COLORS 3
+struct TextRGBColor {
   unsigned char red;
   unsigned char green;
   unsigned char blue;
-} rgb_colors[] = {
-  {   0,   0,   0 }, // black
+} text_rgb_colors[] = {
   { 255,   0,   0 }, // red
   {   0, 255,   0 }, // green
   {   0,   0, 255 }, // blue
-  { 192, 140,   0 }, // yellow
-  { 192,   0, 192 }, // purple
-  { 255, 100,   0 }, // orange
-  { 255, 255, 255 }  // white
 };
-*/
 
 // declare an array that can hold the NeoPixel version of the predefined colors
 uint32_t colors[NUM_COLORS];
+uint32_t text_colors[NUM_COLORS];
 
 // variable to hold the current color index (used for some modes)
 unsigned char colorIndex = 0;
@@ -260,6 +254,9 @@ void mode_cycle_loop()
         if(pixelColors[col][row] >= NUM_COLORS) {
             pixelColors[col][row] = 0;
         }
+
+        // clear the rising edge on this switch so that it won't get processed again
+        pixelPressedPrior[col][row] = pixelPressed[col][row];
       }
 
       // set the corresponding pixel color
@@ -487,10 +484,10 @@ boolean mode_scroll_text_loop()
 {
   boolean finishStatus = false;
   
-  fillColor(colors[NUM_COLORS - 1]);
+  fillColor(matrix.Color(0, 0, 0));
 
   matrix.setCursor(animateCol, 1);
-  matrix.setTextColor(colors[colorIndex]);
+  matrix.setTextColor(text_colors[colorIndex]);
   matrix.print(message);
   matrix.show();
 
@@ -500,7 +497,7 @@ boolean mode_scroll_text_loop()
     colorIndex++;
  
     // check to see if we have reached the end of all colors
-    if(colorIndex >= (NUM_COLORS - 1)) {
+    if(colorIndex >= NUM_TEXT_COLORS) {
       colorIndex = 0;
     }
 
@@ -531,7 +528,7 @@ void mode_screensaver_loop()
   
       // update the color index for the next time the text starts
       textColorIndex++;
-      if(textColorIndex >= (NUM_COLORS - 1)) {
+      if(textColorIndex >= NUM_TEXT_COLORS) {
         textColorIndex = 0;
       }
   
@@ -600,6 +597,10 @@ void setup()
   // initialize the array of colors
   for(i = 0; i < NUM_COLORS; i++) {
     colors[i] = matrix.Color(rgb_colors[i].red, rgb_colors[i].green, rgb_colors[i].blue);
+  }
+
+  for(i = 0; i < NUM_TEXT_COLORS; i++) {
+    text_colors[i] = matrix.Color(text_rgb_colors[i].red, text_rgb_colors[i].green, text_rgb_colors[i].blue);
   }
 
   // initialize the neoPixel matrix
