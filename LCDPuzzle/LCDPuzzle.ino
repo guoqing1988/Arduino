@@ -1,5 +1,10 @@
 // include the library code:
 #include <LiquidCrystal.h>
+#include <Servo.h>
+
+// define the Servo
+#define SERVO_PIN 10
+Servo lockServo;
 
 // define the LCD display and associated variables
 #define LCD_RS  2
@@ -57,6 +62,8 @@ void setup() {
 
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
+
+  lockServo.attach(SERVO_PIN);
 }
 
 void playCode(Morse code) {
@@ -122,6 +129,8 @@ void playNumberCode(unsigned int num) {
 void loop() {
   switch(currentSDState) {
     case MISSING:
+      lockServo.write(0);
+      
       // Print a message to the LCD.
       lcd.clear();
       lcd.setCursor(0, 0);
@@ -132,6 +141,8 @@ void loop() {
       currentSDState = BAD_PASSWORD;
       break;
     case BAD_PASSWORD:
+      lockServo.write(0);
+
       // Print a message to the LCD.
       lcd.clear();
       lcd.setCursor(0, 0);
@@ -142,6 +153,8 @@ void loop() {
       currentSDState = GOOD_PASSWORD;
       break;
     case GOOD_PASSWORD:
+      lockServo.write(90);
+
       // Print a message to the LCD.
       lcd.clear();
       lcd.setCursor(0, 0);
