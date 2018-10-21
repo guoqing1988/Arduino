@@ -1,10 +1,6 @@
-// include the library code:
 #include <LiquidCrystal.h>
-#include <Servo.h>
-
-// define the Servo
-#define SERVO_PIN 10
-Servo lockServo;
+#include <SPI.h>
+#include <SD.h>
 
 // define the LCD display and associated variables
 #define LCD_RS  2
@@ -16,12 +12,17 @@ Servo lockServo;
 LiquidCrystal lcd(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 
 // define the SD card reader and associated variables
+#define SD_CD   8
+#define SD_CS  53
+#define SD_FILENAME "PASSWORD.TXT"
+#define SD_PASSWORD "WAR GAMES"
 enum SDState {
-  MISSING,
-  BAD_PASSWORD,
-  GOOD_PASSWORD
+  SDSTATE_MISSING,
+  SDSTATE_INIT_ERROR,
+  SDSTATE_FILE_ERROR,
+  SDSTATE_BAD_PASSWORD,
+  SDSTATE_GOOD_PASSWORD
 };
-SDState currentSDState = MISSING;
   
 // define and PIEZO buzzer and associated variables
 #define PIEZO_PIN 13
@@ -60,17 +61,18 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
 
+  // enable the pullup resistor on the CD pin of the SD card
+  pinMode(SD_CD, INPUT_PULLUP);
+  
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
-
-  lockServo.attach(SERVO_PIN);
 }
 
 void playCode(Morse code) {
   boolean piezoOn = true;
   unsigned int duration = 0;
   unsigned int delayTime = 0;
-  
+
   switch(code) {
     case DOT:
       delayTime = DOT_TIME;
@@ -95,11 +97,6 @@ void playCode(Morse code) {
       break;
   }
 
-  Serial.print("On = ");
-  Serial.print(piezoOn);
-  Serial.print(" Delay = ");
-  Serial.println(delayTime);
-  
   if(piezoOn) {
     tone(PIEZO_PIN, PIEZO_TONE);
   }
@@ -126,55 +123,131 @@ void playNumberCode(unsigned int num) {
   }
 }
 
-void loop() {
-  switch(currentSDState) {
-    case MISSING:
-      lockServo.write(0);
-      
-      // Print a message to the LCD.
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("     LOCKED     ");
-      lcd.setCursor(0, 1);
-      lcd.print("   NO SD CARD   ");
+#define MAX_BUF_LEN 64
 
-      currentSDState = BAD_PASSWORD;
-      break;
-    case BAD_PASSWORD:
-      lockServo.write(0);
+boolean passwordFound() {
+  static SDState priorState = SDSTATE_MISSING;
+  static String password = SD_PASSWORD;
+  static boolean firstTime = true;
+  int passwordLen = 0;
+  int passwordIndex = 0;
+  SDState newState = priorState;
 
-      // Print a message to the LCD.
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("     LOCKED     ");
-      lcd.setCursor(0, 1);
-      lcd.print("SD: BAD PASSWORD");
-
-      currentSDState = GOOD_PASSWORD;
-      break;
-    case GOOD_PASSWORD:
-      lockServo.write(90);
-
-      // Print a message to the LCD.
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("****UNLOCKED****");
-      lcd.setCursor(0, 1);
-      lcd.print("  ...Listen...  ");
-
-      currentSDState = MISSING;
-      break;
+  // if the password was found in the past, don't check again
+  if(priorState == SDSTATE_GOOD_PASSWORD) {
+    return true;
   }
 
-  playNumberCode(9);
-  playCode(LETTER_BREAK);
+  // check to see if the SD card is inserted
+  if(digitalRead(SD_CD) == HIGH) {
+    // if the card was just inserted, then read the password file
+    if(priorState == SDSTATE_MISSING) {
+      // delay for 0.5 seconds to give time for card to be fully inserted
+      delay(500);
 
-  playNumberCode(2);
-  playCode(LETTER_BREAK);
+      // initialize the SD card
+      if(SD.begin(SD_CS)) {
+        // open the password file
+        File passwordFile = SD.open(SD_FILENAME);
+        if(passwordFile) {
+          // find the first character in the file that does not match the password
+          passwordLen = password.length();
+          for(passwordIndex = 0;
+              (passwordIndex < passwordLen) &&
+              (passwordFile.available()) &&
+              (passwordFile.read() == password.charAt(passwordIndex));
+              passwordIndex++);
+      
+          // close the file
+          passwordFile.close();
+  
+          // if the loop reached the end of the password string, then
+          // the password was verified, otherwise, the incorrect password
+          // was supplied
+          if(passwordIndex >= passwordLen) {
+            newState = SDSTATE_GOOD_PASSWORD;
+          }
+          else {
+            newState = SDSTATE_BAD_PASSWORD;
+          }
+        } else {
+          // if the file didn't open, set the new state to a file error
+          newState = SDSTATE_FILE_ERROR;
+        }
+      }
+      else {
+        // if the SD card didn't initialize, set the new state to an init error
+        newState = SDSTATE_INIT_ERROR;
+      }
+    }
+  }
+  else {
+    newState = SDSTATE_MISSING;
+  }
 
-  playNumberCode(4);
-  playCode(LETTER_BREAK);
+  if((newState != priorState) || (firstTime)) {
+    switch(newState) {
+      case SDSTATE_MISSING:
+        // Print a message to the LCD.
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("     LOCKED     ");
+        lcd.setCursor(0, 1);
+        lcd.print("   NO SD CARD   ");
+        break;
+      case SDSTATE_INIT_ERROR:
+        // Print a message to the LCD.
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("     LOCKED     ");
+        lcd.setCursor(0, 1);
+        lcd.print("SD ERROR: INIT  ");
+        break;
+      case SDSTATE_FILE_ERROR:
+        // Print a message to the LCD.
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("     LOCKED     ");
+        lcd.setCursor(0, 1);
+        lcd.print("SD ERROR: FILE  ");
+        break;
+      case SDSTATE_BAD_PASSWORD:
+        // Print a message to the LCD.
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("     LOCKED     ");
+        lcd.setCursor(0, 1);
+        lcd.print("SD: BAD PASSWORD");
+        break;
+      case SDSTATE_GOOD_PASSWORD:
+        // Print a message to the LCD.
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("****UNLOCKED****");
+        lcd.setCursor(0, 1);
+        lcd.print("  ...Listen...  ");
+        break;
+    }
+  }
 
-  playNumberCode(7);
-  playCode(MESSAGE_BREAK);
+  priorState = newState;
+  firstTime = false;
+
+  return (priorState == SDSTATE_GOOD_PASSWORD);
+}
+
+void loop() {
+  if(passwordFound()) {
+    playNumberCode(9);
+    playCode(LETTER_BREAK);
+  
+    playNumberCode(2);
+    playCode(LETTER_BREAK);
+  
+    playNumberCode(4);
+    playCode(LETTER_BREAK);
+  
+    playNumberCode(7);
+    playCode(MESSAGE_BREAK);
+  }
 }
