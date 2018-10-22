@@ -12,9 +12,10 @@
 LiquidCrystal lcd(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 
 // define the SD card reader and associated variables
-#define SD_CD   8
+#define SD_CD  49
 #define SD_CS  53
 #define SD_FILENAME "PASSWORD.TXT"
+#define SD_PASSWORD_DELAY 5000
 #define SD_PASSWORD "WAR GAMES"
 enum SDState {
   SDSTATE_MISSING,
@@ -56,6 +57,8 @@ Morse numberCodes[][CODES_PER_NUMBER] = {
   { DASH, DASH, DASH,  DOT,  DOT }, // 8
   { DASH, DASH, DASH, DASH,  DOT }  // 9
 };
+
+int passcodeDigits[] = { 9, 2, 4, 7 };
 
 void setup() {
   // put your setup code here, to run once:
@@ -150,6 +153,16 @@ boolean passwordFound() {
         // open the password file
         File passwordFile = SD.open(SD_FILENAME);
         if(passwordFile) {
+          // Print a message to the LCD that the password is being read
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("     LOCKED     ");
+          lcd.setCursor(0, 1);
+          lcd.print("READING PASSWORD");
+          
+          // Delay to give the user time to read the LCD message
+          delay(SD_PASSWORD_DELAY);
+
           // find the first character in the file that does not match the password
           passwordLen = password.length();
           for(passwordIndex = 0;
@@ -237,17 +250,16 @@ boolean passwordFound() {
 }
 
 void loop() {
+  int passcodeLength = sizeof(passcodeDigits) / sizeof(int);
+  int i;
+  
   if(passwordFound()) {
-    playNumberCode(9);
-    playCode(LETTER_BREAK);
-  
-    playNumberCode(2);
-    playCode(LETTER_BREAK);
-  
-    playNumberCode(4);
-    playCode(LETTER_BREAK);
-  
-    playNumberCode(7);
+    for(i = 0; i < passcodeLength; i++) {
+      if(i > 0) {
+        playCode(LETTER_BREAK);
+      }
+      playNumberCode(passcodeDigits[i]);
+    }
     playCode(MESSAGE_BREAK);
   }
 }
