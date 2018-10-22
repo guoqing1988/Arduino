@@ -3,17 +3,17 @@
 #include <SD.h>
 
 // define the LCD display and associated variables
-#define LCD_RS  2
-#define LCD_E   3
-#define LCD_D4  4
-#define LCD_D5  5
-#define LCD_D6  6
-#define LCD_D7  7
+#define LCD_RS 19
+#define LCD_E  18
+#define LCD_D4 17
+#define LCD_D5 16
+#define LCD_D6 15
+#define LCD_D7 14
 LiquidCrystal lcd(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 
 // define the SD card reader and associated variables
-#define SD_CD  49
-#define SD_CS  53
+#define SD_CD  9
+#define SD_CS 10
 #define SD_FILENAME "PASSWORD.TXT"
 #define SD_PASSWORD_DELAY 5000
 #define SD_PASSWORD "WAR GAMES"
@@ -26,7 +26,7 @@ enum SDState {
 };
   
 // define and PIEZO buzzer and associated variables
-#define PIEZO_PIN 13
+#define PIEZO_PIN 3
 #define PIEZO_TONE 349
 
 #define DOT_TIME  200
