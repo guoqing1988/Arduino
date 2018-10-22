@@ -48,6 +48,9 @@ UTFT myGLCD(SSD1289,38,39,40,41);    //(Model,RS,WR,CS,RST)
 UTouch myTouch ( 6, 5, 4, 3, 2);
 */
 
+int passcode[4];
+int passcodeLength = 0;
+
 void setup() {
   Serial.begin(9600);
 
@@ -102,12 +105,32 @@ identifier=0x9341;
   Serial.println("SYSTEM STARTED");
 }
 
+void addPasscode(int digit) {
+  // return if this is an invalid digit
+  if((digit < 0) || (digit > 9)) {
+    return;
+  }
+
+  // return if the passcode is full
+  if((passcodeLength < 0) || (passcodeLength >= 4)) {
+    return;
+  }
+
+  passcode[passcodeLength++] = digit;
+  drawPasscode();
+}
+
+void clearPasscode() {
+  passcodeLength = 0;
+  drawPasscode();
+}
+
 void loop() {
   int x,y;
 
   // a point object holds x y and z coordinates
   TSPoint p = ts.getPoint();
-  
+
   // we have some minimum pressure we consider 'valid'
   // pressure of 0 means no pressing!
   // was previously p.z > ts.pressureThreshhold
@@ -126,14 +149,17 @@ void loop() {
     {
       if ((x>=21) && (x<=85))  //button 1
       {
+        addPasscode(1);
         Serial.println("1");
       }
       if ((x>=87) && (x<=152))  //button 2
       {
+        addPasscode(2);
         Serial.println("2");
       }
       if ((x>=154) && (x<=218))  //button 3
       {
+        addPasscode(3);
         Serial.println("3");
       }
     }
@@ -141,14 +167,17 @@ void loop() {
     {
       if ((x>=21) && (x<=85))  //button 4
       {
+        addPasscode(4);
         Serial.println("4");
       }
       if ((x>=87) && (x<=152))  //button 5
       {
+        addPasscode(5);
         Serial.println("5");
       }
       if ((x>=154) && (x<=218))  //button 6
       {
+        addPasscode(6);
         Serial.println("6");
       }
     }
@@ -156,14 +185,17 @@ void loop() {
     {
       if ((x>=21) && (x<=85))  //button 7
       {
+        addPasscode(7);
         Serial.println("7");
       }
       if ((x>=87) && (x<=152))  //button 8
       {
+        addPasscode(8);
         Serial.println("8");
       }
       if ((x>=154) && (x<=218))  //button 9
       {
+        addPasscode(9);
         Serial.println("9");
       }
     }
@@ -171,10 +203,12 @@ void loop() {
     {
       if ((x>=21) && (x<=85))  //clear button
       {
+        clearPasscode();
         Serial.println("CLEAR");
       }
       if ((x>=87) && (x<=152))  //button 0
       {
+        addPasscode(0);
         Serial.println("0");
       }
       if ((x>=154) && (x<=218))  //enter button
@@ -185,79 +219,6 @@ void loop() {
   }
 
   delay(100);
-
-/*
-  while (true)
-  {
-    if (myTouch.dataAvailable())
-    {
-      myTouch.read();
-      x=myTouch.getX();
-      y=myTouch.getY();
-      
-      if ((y>=41) && (y<=89))    //top row
-      {
-        if ((x>=21) && (x<=85))  //button 1
-        {
-          Serial.println("1");
-        }
-        if ((x>=87) && (x<=152))  //button 2
-        {
-          Serial.println("2");
-        }
-        if ((x>=154) && (x<=218))  //button 3
-        {
-          Serial.println("3");
-        }
-      }
-      if ((y>=91) && (y<=139))    //middle row
-      {
-        if ((x>=21) && (x<=85))  //button 4
-        {
-          Serial.println("4");
-        }
-        if ((x>=87) && (x<=152))  //button 5
-        {
-          Serial.println("5");
-        }
-        if ((x>=154) && (x<=218))  //button 6
-        {
-          Serial.println("6");
-        }
-      }
-      if ((y>=141) && (y<=189))    //bottom row
-      {
-        if ((x>=21) && (x<=85))  //button 7
-        {
-          Serial.println("7");
-        }
-        if ((x>=87) && (x<=152))  //button 8
-        {
-          Serial.println("8");
-        }
-        if ((x>=154) && (x<=218))  //button 9
-        {
-          Serial.println("9");
-        }
-      }
-      if ((y>=191) && (y<=238))    //bottom row
-      {
-        if ((x>=21) && (x<=85))  //clear button
-        {
-          Serial.println("CLEAR");
-        }
-        if ((x>=87) && (x<=152))  //button 0
-        {
-          Serial.println("0");
-        }
-        if ((x>=154) && (x<=218))  //enter button
-        {
-          Serial.println("ENTER");
-        }
-      }
-    }
-  }
-*/
 }
 
 /*
@@ -277,6 +238,40 @@ void drawWelcome_msg(){
 }
 */
 
+void drawPasscode() {
+  int i;
+
+  Serial.print("draw: length = ");
+  Serial.print(passcodeLength);
+  Serial.print(" code = ");
+
+/*
+  tft.fillRoundRect(20,239,(219-20+1),(274-239+1), 10, RED);
+  tft.drawRoundRect(20,239,(219-20+1),(274-239+1), 10, WHITE);
+  
+  tft.setTextColor(WHITE);
+  tft.setTextSize(2);
+  tft.setCursor(60, 251);
+*/
+
+  for(i = 0; i < 4; i++) {
+    if(i > 0) {
+      Serial.print(", ");
+//      tft.print("  ");
+    }
+    
+    if(i >= passcodeLength) {
+      Serial.print("-");
+//      tft.print("-");
+    }
+    else {
+      Serial.print(passcode[i]);
+//      tft.print(passcode[i]);
+    }
+  }
+  Serial.println();
+}
+
 void drawButtons(){
 /*
   myGLCD.clrScr();
@@ -285,36 +280,8 @@ void drawButtons(){
   myGLCD.fillRect(1,289,239,319);
   myGLCD.fillRoundRect(20,40,219,229);
   myGLCD.fillRoundRect(20,239,219,274);
-  myGLCD.setColor(VGA_WHITE);
-  myGLCD.print("CAR SECURITY SYSTEM", CENTER, 10);
-  myGLCD.print("SHANE CONCANNON - G00286539", CENTER, 299);
-  myGLCD.drawRoundRect(20,40,219,229);
-  myGLCD.drawRoundRect(20,239,219,274);
-  myGLCD.print("  ___   ___  ___  ___  ", CENTER, 255);
-  myGLCD.drawLine(86,40,86,229);
-  myGLCD.drawLine(153,40,153,229);
-  myGLCD.drawLine(20,90,219,90);
-  myGLCD.drawLine(20,140,219,140);
-  myGLCD.drawLine(20,190,219,190);
-  myGLCD.print("CLEAR", 35, 204);
-  myGLCD.print("ENTER", 167, 204);
-  myGLCD.setFont(BigFont);
-  myGLCD.printNumI(0,112,202);
-  myGLCD.printNumI(1,45,57);
-  myGLCD.printNumI(2,112,57);
-  myGLCD.printNumI(3,178,57);
-  myGLCD.printNumI(4,45,107);
-  myGLCD.printNumI(5,112,107);
-  myGLCD.printNumI(6,178,107);
-  myGLCD.printNumI(7,45,157);
-  myGLCD.printNumI(8,112,157);
-  myGLCD.printNumI(9,178,157);
 */
-
   tft.fillScreen(BLACK);
-/*
-  myGLCD.setColor(VGA_RED);
-*/
   tft.fillRect(1,1,239,30,RED);
   tft.fillRect(1,289,239,319,RED);
   tft.fillRoundRect(20,40,(219-20+1),(229-40+1), 10, RED);
@@ -328,21 +295,49 @@ void drawButtons(){
   tft.setCursor(7, 8);
   tft.setTextColor(WHITE);
   tft.setTextSize(2);
-  tft.print("CAR SECURITY SYSTEM");
-  
+  tft.print("  LIGHTING SYSTEM  ");
+  tft.setCursor(7, 297);
+  tft.print(" PASSCODE REQUIRED ");
+
+/*
+  myGLCD.drawRoundRect(20,40,219,229);
+  myGLCD.drawRoundRect(20,239,219,274);
+*/
   tft.drawRoundRect(20,40,(219-20+1),(229-40+1), 10, WHITE);
   tft.drawRoundRect(20,239,(219-20+1),(274-239+1), 10, WHITE);
+
 /*
   myGLCD.print("  ___   ___  ___  ___  ", CENTER, 255);
+*/
+/*
+  tft.setCursor(60, 251);
+  tft.print("-  -  -  -");
+*/
+  drawPasscode();
+
+/*
+  myGLCD.drawLine(86,40,86,229);
+  myGLCD.drawLine(153,40,153,229);
+  myGLCD.drawLine(20,90,219,90);
+  myGLCD.drawLine(20,140,219,140);
+  myGLCD.drawLine(20,190,219,190);
 */
   tft.drawLine(86,40,86,229, WHITE);
   tft.drawLine(153,40,153,229, WHITE);
   tft.drawLine(20,90,219,90, WHITE);
   tft.drawLine(20,140,219,140, WHITE);
   tft.drawLine(20,190,219,190, WHITE);
+
 /*
   myGLCD.print("CLEAR", 35, 204);
   myGLCD.print("ENTER", 167, 204);
+*/
+  tft.setCursor(25, 204);
+  tft.print("CLEAR");
+  tft.setCursor(157, 204);
+  tft.print("ENTER");
+
+/*
   myGLCD.setFont(BigFont);
   myGLCD.printNumI(0,112,202);
   myGLCD.printNumI(1,45,57);
@@ -355,6 +350,26 @@ void drawButtons(){
   myGLCD.printNumI(8,112,157);
   myGLCD.printNumI(9,178,157);
 */
+  tft.setTextSize(3);
+  tft.setCursor(112, 200);
+  tft.print(0);
+  tft.setCursor(45,55);
+  tft.print(1);
+  tft.setCursor(112,55);
+  tft.print(2);
+  tft.setCursor(178,55);
+  tft.print(3);
+  tft.setCursor(45,105);
+  tft.print(4);
+  tft.setCursor(112,105);
+  tft.print(5);
+  tft.setCursor(178,105);
+  tft.print(6);
+  tft.setCursor(45,155);
+  tft.print(7);
+  tft.setCursor(112,155);
+  tft.print(8);
+  tft.setCursor(178,155);
+  tft.print(9);
 }
-
 
