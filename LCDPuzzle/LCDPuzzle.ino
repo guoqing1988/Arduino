@@ -3,17 +3,32 @@
 #include <SD.h>
 
 // define the LCD display and associated variables
-#define LCD_RS 19
-#define LCD_E  18
-#define LCD_D4 17
-#define LCD_D5 16
-#define LCD_D6 15
-#define LCD_D7 14
+#define LCD_RS 7
+#define LCD_E  6
+#define LCD_D4 5
+#define LCD_D5 4
+#define LCD_D6 3
+#define LCD_D7 2
 LiquidCrystal lcd(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 
 // define the SD card reader and associated variables
-#define SD_CD  9
-#define SD_CS 10
+//
+// The SD card uses SPI which has different pinouts on an Uno and a Mega
+// The following table shows the SPI signal name, the corresponding pin
+// on the SD card, and the digital output for that signal on both
+// an Uno and a Mega
+// SPI_Signal SDPin UnoPin  MegaPin
+// SCK        CLK   13      52
+// MISO       DO    12      50
+// MOSI       DI    11      51
+// SS         CS    10      53
+//
+// The table shows the typical pin for CS, but you can specify it in SW
+#define SD_CS 49
+// There is also a non-SPI pin (CD) used as a digital input on the Arduino to determine
+// if an SD card is inserted. This pin requires use of the internal pullup resistor on
+// that digital input
+#define SD_CD 48
 #define SD_FILENAME "PASSWORD.TXT"
 #define SD_PASSWORD_DELAY 5000
 #define SD_PASSWORD "WAR GAMES"
@@ -26,7 +41,7 @@ enum SDState {
 };
   
 // define and PIEZO buzzer and associated variables
-#define PIEZO_PIN 3
+#define PIEZO_PIN 13
 #define PIEZO_TONE 349
 
 #define DOT_TIME  200
