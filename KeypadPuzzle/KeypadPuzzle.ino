@@ -80,13 +80,13 @@
 // the data (phone #) we store in the textfield
 #define MAX_TEXT_LEN 12
 String textfield;
-String serverPhoneNum = "760-518-1356";
+String serverPhoneNum = "760-670-4258";
 
-#define SERVER_X 20
-#define SERVER_Y 20
+#define SERVER_X 22
+#define SERVER_Y 30
 #define SERVER_W 200
-#define SERVER_H 300
-#define SERVER_SPACING_Y 20
+#define SERVER_H 270
+#define SERVER_SPACING_Y 15
 #define SERVER_TSIZE 1
 #define SERVER_TCOLOR ILI9341_GREEN
 
@@ -217,30 +217,67 @@ void status(char *msg) {
   tft.print(msg);
 }
 
-#define MINPRESSURE 10
+#define MINPRESSURE 100
 #define MAXPRESSURE 1000
 
 void drawServerWindow() {
   int x = SERVER_X + 5;
   int y = SERVER_Y + 5;
+  String username = "R3aP3rDo0D";
   
   tft.fillRect(SERVER_X, SERVER_Y, SERVER_W, SERVER_H, ILI9341_BLACK);
   tft.drawRect(SERVER_X, SERVER_Y, SERVER_W, SERVER_H, ILI9341_WHITE);
-  tft.setTextColor(SERVER_TCOLOR);
   tft.setTextSize(SERVER_TSIZE);
 
+  tft.setTextColor(ILI9341_WHITE);
   tft.setCursor(x, y);
-  tft.print("SERVER AUTHENTICATED...");
+  tft.print("SERVER CONNECTED");
+  delay(1000);
+
+  tft.setTextColor(SERVER_TCOLOR);
+
+  y += (SERVER_SPACING_Y * 2);
+  tft.setCursor(x, y);
+  tft.print("Welcome To OpenVMS (TM)");
+  y += SERVER_SPACING_Y;
+  tft.setCursor(x, y);
+  tft.print("VAX Operating System");
+  y += SERVER_SPACING_Y;
+  tft.setCursor(x, y);
+  tft.print("Version 7.3");
+
+  y += (SERVER_SPACING_Y * 2);
+  tft.setCursor(x, y);
+  tft.print("Username: ");
+  for(int i = 0; i < username.length(); i++) {
+    tft.print(username.charAt(i));
+    delay(400);
+  }
   delay(1000);
 
   y += SERVER_SPACING_Y;
   tft.setCursor(x, y);
-  tft.print("Welcome back");
-  delay(2000);
+  tft.print("Password: ");
+  for(int i = 0; i < 15; i++) {
+    tft.print("*");
+    delay(200);
+  }
+  delay(1000);
+  
+  y += SERVER_SPACING_Y;
+  tft.setCursor(x, y);
+  tft.print("**ADMIN CREDENTIALS AUTHORIZED**");
+  delay(1000);
   
   y += (SERVER_SPACING_Y * 2);
   tft.setCursor(x, y);
+  tft.print("Welcome back");
+  delay(1000);
+
+  y += SERVER_SPACING_Y;
+  tft.setCursor(x, y);
   tft.print("It's my play");
+  delay(1000);
   for(int i = 0; i < 5; i++) {
     tft.print(".");
     delay(1000);
@@ -248,20 +285,35 @@ void drawServerWindow() {
   
   y += (SERVER_SPACING_Y * 2);
   tft.setCursor(x, y);
-  tft.print("  * * BISHOP TAKES ROOK * *");
-  delay(3000);
+  tft.setTextColor(ILI9341_RED);
+  tft.print("  * * KNIGHT TAKES ROOK * *");
+  delay(1000);
   
-  y += (SERVER_SPACING_Y * 3);
+  y += (SERVER_SPACING_Y * 2);
   tft.setCursor(x, y);
-  tft.println("Call ended");
+  tft.setTextColor(SERVER_TCOLOR);
+  tft.print("AutoLogout initiated");
+  delay(2000);
+
+  y += (SERVER_SPACING_Y * 2);
+  tft.setCursor(x, y);
+  tft.setTextColor(ILI9341_WHITE);
+  tft.println("SERVER DISCONNECTED");
 
   delay(5000);
-  
+
+  // clear the screen
   tft.fillScreen(BLACK);
+
+  // redraw the keypad
   for(int i = 0; i < 15; i++) {
     buttons[i].drawButton();
   }
 
+  // clear the text field
+  textfield.remove(0);
+
+  // redraw the text field
   drawTextField();
 }
 
@@ -379,7 +431,7 @@ void loop(void) {
           //fona.callPhone(textfield);
         }
         
-      delay(100); // UI debouncing
+      delay(200); // UI debouncing
     }
   }
   
