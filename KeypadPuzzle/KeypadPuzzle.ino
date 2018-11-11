@@ -96,7 +96,7 @@ String serverPhoneNum = "760-670-4258";
 #define XP 8   // can be a digital pin
 
 //Touch For New ILI9341 TP
-#define TS_MINX 120
+#define TS_MINX 250
 #define TS_MAXX 900
 
 #define TS_MINY 70
