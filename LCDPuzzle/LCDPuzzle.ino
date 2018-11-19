@@ -73,7 +73,7 @@ Morse numberCodes[][CODES_PER_NUMBER] = {
   { DASH, DASH, DASH, DASH,  DOT }  // 9
 };
 
-int passcodeDigits[] = { 9, 2, 4, 7 };
+int passcodeDigits[] = { 7, 3, 6 };
 
 void setup() {
   // put your setup code here, to run once:
