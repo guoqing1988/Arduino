@@ -8,8 +8,8 @@
  pin 11 is connected to LOAD 
  We have only a single MAX72XX.
  */
-#define NUM_BOARDS 2
-LedControl lc=LedControl(12,10,11,NUM_BOARDS);
+#define NUM_BOARDS 1
+LedControl lc=LedControl(7,5,6,NUM_BOARDS); // DIN, CLK, LOAD (or CS)
 
 #define NUM_DIGITS 16
 String msg = "760-518-1356";
@@ -126,8 +126,8 @@ void testDisplay() {
 }
 
 void loop() { 
-//  writeArduinoOn7Segment();
+  writeArduinoOn7Segment();
 //  scrollDigits();
 //  testDisplay();
-  scrollMessage();
+//  scrollMessage();
 }

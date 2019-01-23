@@ -1,10 +1,15 @@
 #include <SoftwareSerial.h>
 
-// Was able to get this to work on an Arduino UNO
-// For some reason, the same setup on a Mega 2560 did not work
-int bluetoothTX = 2; // TX-0 pin of bluetooth on Arduino D2
-int bluetoothRX = 3; // RX-1 pin of bluetooth on Arduino D3
-
+// SoftwareSerial takes two parameters in the following order: RX pin, TX pin
+// These are the pins that the Arduino will use to receive and transmit (repsectively)
+// The Arduino RX pin should be connected to the Bluetooth TX pin
+// The Arduino TX pin should be connected to the Bluetooth RX pin
+// Therefore, it's easiest define variables to define which Arduino pins
+// the bluetooth RX and TX pins are connected to.
+// Then the SoftwareSerial port will be defined using the bluetoothTX pin
+// for the Arduino RX pin, and the bluetoothRX pin for the Arduino TX pin.
+int bluetoothTX = 10; // Note: pin 10 for the Arduino RX pin works on Uno, Mega, and Leonardo
+int bluetoothRX = 11;
 SoftwareSerial BT(bluetoothTX, bluetoothRX);
 
 void setup()  
