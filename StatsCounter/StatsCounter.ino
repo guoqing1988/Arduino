@@ -21,7 +21,7 @@ int bluetoothRX = 11;
 SoftwareSerial BT(bluetoothTX, bluetoothRX);
 
 #define NUM_BUTTONS (2)
-int buttonPins[NUM_BUTTONS] = { 3, 2 };
+int buttonPins[NUM_BUTTONS] = { 2, 3 };
 
 bool buttonState[NUM_BUTTONS];
 bool lastButtonState[NUM_BUTTONS];
